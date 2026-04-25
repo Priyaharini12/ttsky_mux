@@ -2,39 +2,64 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import cocotb
-from cocotb.clock import Clock
-from cocotb.triggers import ClockCycles
+from cocotb.triggers import Timer
 
 
 @cocotb.test()
 async def test_project(dut):
-    dut._log.info("Start")
+    dut._log.info("Start MUX4 Test")
 
-    # Set the clock period to 10 us (100 KHz)
-    clock = Clock(dut.clk, 10, unit="us")
-    cocotb.start_soon(clock.start())
-
-    # Reset
-    dut._log.info("Reset")
+    # Initialize inputs
     dut.ena.value = 1
     dut.ui_in.value = 0
     dut.uio_in.value = 0
+
+    # Reset sequence
     dut.rst_n.value = 0
-    await ClockCycles(dut.clk, 10)
+    await Timer(50, units="ns")
+
     dut.rst_n.value = 1
+    await Timer(50, units="ns")
 
-    dut._log.info("Test project behavior")
+    # Test cases
+    # (a, s, expected_y)
+    test_cases = [
+        (0b1001, 0b00, 1),
+        (0b1001, 0b01, 0),
+        (0b1001, 0b10, 0),
+        (0b1001, 0b11, 1),
+    ]
 
-    # Set the input values you want to test
-    dut.ui_in.value = 20
-    dut.uio_in.value = 30
+    # Apply test cases
+    for a, s, expected_y in test_cases:
 
-    # Wait for one clock cycle to see the output values
-    await ClockCycles(dut.clk, 1)
+        # ui_in mapping
+        # ui_in[3:0] = a
+        # ui_in[5:4] = s
+        dut.ui_in.value = (s << 4) | a
 
-    # The following assersion is just an example of how to check the output values.
-    # Change it to match the actual expected output of your module:
-    assert dut.uo_out.value == 50
+        # Wait for output propagation
+        await Timer(20, units="ns")
 
-    # Keep testing the module by changing the input values, waiting for
-    # one or more clock cycles, and asserting the expected output values.
+        try:
+            # Read output
+            output_val = int(dut.uo_out.value)
+
+            # Extract mux output from bit 0
+            actual_y = output_val & 0x1
+
+            dut._log.info(
+                f"a={a:04b}, s={s:02b}, y={actual_y}"
+            )
+
+            # Assertion
+            assert actual_y == expected_y, \
+                f"Failed: a={a:04b}, s={s:02b}, expected={expected_y}, got={actual_y}"
+
+        except ValueError:
+            dut._log.error(
+                f"Conversion Error: uo_out = {str(dut.uo_out.value)}"
+            )
+            raise
+
+    dut._log.info("All MUX4 test cases passed")
