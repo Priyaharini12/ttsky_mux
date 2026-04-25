@@ -4,7 +4,7 @@
 module tb ();
 
   initial begin
-    $dumpfile("tb.fst");
+    $dumpfile("tb.vcd");
     $dumpvars(0, tb);
     #1;
   end
@@ -26,7 +26,7 @@ module tb ();
 `endif
 
   // Instantiate Tiny Tapeout top module
-  tt_um_example user_project (
+  tt_um_mux user_project (
 
 `ifdef GL_TEST
       .VPWR(VPWR),
